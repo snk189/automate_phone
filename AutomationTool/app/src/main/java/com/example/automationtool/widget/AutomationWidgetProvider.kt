@@ -5,9 +5,11 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.widget.RemoteViews
 import com.example.automationtool.R
 import com.example.automationtool.automation.AccessibilityAutomationService
+import java.io.File
 
 class AutomationWidgetProvider : AppWidgetProvider() {
 
@@ -20,7 +22,7 @@ class AutomationWidgetProvider : AppWidgetProvider() {
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         for (appWidgetId in appWidgetIds) {
             val prefs = context.getSharedPreferences(PREFS_NAME, 0)
-            prefs.edit().remove(PREF_PREFIX_KEY + appWidgetId).remove(PREF_PREFIX_NAME + appWidgetId).apply()
+            prefs.edit().remove(PREF_PREFIX_KEY + appWidgetId).remove(PREF_PREFIX_NAME + appWidgetId).remove(PREF_PREFIX_ICON + appWidgetId).apply()
         }
     }
 
@@ -28,14 +30,23 @@ class AutomationWidgetProvider : AppWidgetProvider() {
         const val PREFS_NAME = "com.example.automationtool.widget.AutomationWidget"
         const val PREF_PREFIX_KEY = "appwidget_"
         const val PREF_PREFIX_NAME = "appwidget_name_"
+        const val PREF_PREFIX_ICON = "appwidget_icon_"
 
         internal fun updateAppWidget(context: Context, appWidgetManager: AppWidgetManager, appWidgetId: Int) {
             val prefs = context.getSharedPreferences(PREFS_NAME, 0)
             val automationId = prefs.getLong(PREF_PREFIX_KEY + appWidgetId, -1L)
             val automationName = prefs.getString(PREF_PREFIX_NAME + appWidgetId, "Run Script")
+            val customImagePath = prefs.getString(PREF_PREFIX_ICON + appWidgetId, null)
 
             val views = RemoteViews(context.packageName, R.layout.automation_widget)
             views.setTextViewText(R.id.widget_title, automationName)
+
+            if (customImagePath != null && File(customImagePath).exists()) {
+                val bitmap = BitmapFactory.decodeFile(customImagePath)
+                views.setImageViewBitmap(R.id.widget_icon, bitmap)
+            } else {
+                views.setImageViewResource(R.id.widget_icon, R.mipmap.ic_launcher)
+            }
 
             if (automationId != -1L) {
                 val intent = Intent(context, AccessibilityAutomationService::class.java).apply {

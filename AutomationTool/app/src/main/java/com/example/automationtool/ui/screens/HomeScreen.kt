@@ -12,11 +12,15 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.foundation.background
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.automationtool.automation.AccessibilityAutomationService
 import com.example.automationtool.data.entities.Automation
@@ -110,21 +114,43 @@ fun AutomationCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val gradientBrush = remember {
+        Brush.linearGradient(
+            colors = listOf(
+                Color(0xFFFF007F), // Neon Pink
+                Color(0xFF7928CA)  // Deep Purple
+            )
+        )
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(automation.name, style = MaterialTheme.typography.titleMedium)
-            }
-            IconButton(onClick = onRun) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "Run")
-            }
-            IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "Edit")
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete")
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(gradientBrush)
+        ) {
+            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = automation.name,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+                IconButton(onClick = onRun) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Run", tint = Color.White)
+                }
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                }
             }
         }
     }
