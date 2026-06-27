@@ -10,15 +10,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.foundation.background
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,12 +62,17 @@ fun HomeScreen(
                 }
             }
 
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(automations) { automation ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(top = 16.dp, bottom = 100.dp)
+            ) {
+                items(automations, key = { it.id }) { automation ->
                     AutomationCard(
                         automation = automation,
                         onRun = { viewModel.runAutomation(automation.id) },
                         onEdit = { onNavigateToCreate(automation.id) },
+                        onClone = { viewModel.cloneAutomation(automation) },
+                        onRename = { newName -> viewModel.renameAutomation(automation, newName) },
                         onDelete = { viewModel.deleteAutomation(automation) }
                     )
                 }
@@ -112,14 +115,36 @@ fun AutomationCard(
     automation: Automation,
     onRun: () -> Unit,
     onEdit: () -> Unit,
+    onClone: () -> Unit,
+    onRename: (String) -> Unit,
     onDelete: () -> Unit
 ) {
-    val gradientBrush = remember {
-        Brush.linearGradient(
-            colors = listOf(
-                Color(0xFFFF007F), // Neon Pink
-                Color(0xFF7928CA)  // Deep Purple
-            )
+    var expanded by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+
+    if (showRenameDialog) {
+        var renameText by remember { mutableStateOf(automation.name) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Automation") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onRename(renameText)
+                    showRenameDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
+            }
         )
     }
 
@@ -127,29 +152,48 @@ fun AutomationCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(gradientBrush)
-        ) {
-            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = automation.name,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = automation.name,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            IconButton(onClick = onRun) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Run", tint = MaterialTheme.colorScheme.primary)
+            }
+            
+            Box {
+                IconButton(onClick = { expanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Edit Steps") },
+                        onClick = { expanded = false; onEdit() }
                     )
-                }
-                IconButton(onClick = onRun) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Run", tint = Color.White)
-                }
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color.White)
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.White)
+                    DropdownMenuItem(
+                        text = { Text("Rename") },
+                        onClick = { expanded = false; showRenameDialog = true }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Clone") },
+                        onClick = { expanded = false; onClone() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Delete") },
+                        onClick = { expanded = false; onDelete() }
+                    )
                 }
             }
         }

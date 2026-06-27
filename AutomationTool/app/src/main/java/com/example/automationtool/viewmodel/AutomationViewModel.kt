@@ -32,9 +32,13 @@ class AutomationViewModel(application: Application) : AndroidViewModel(applicati
     private val _currentSteps = MutableStateFlow<List<AutomationStep>>(emptyList())
     val currentSteps: StateFlow<List<AutomationStep>> = _currentSteps
 
+    private val _currentAutomation = MutableStateFlow<Automation?>(null)
+    val currentAutomation: StateFlow<Automation?> = _currentAutomation
+
     private val executor = AutomationExecutor()
 
     private var loadStepsJob: Job? = null
+    private var loadAutomationJob: Job? = null
 
     fun loadStepsForAutomation(automationId: Long) {
         loadStepsJob?.cancel()
@@ -42,6 +46,12 @@ class AutomationViewModel(application: Application) : AndroidViewModel(applicati
             repository.getStepsForAutomation(automationId).collect { steps ->
                 _currentSteps.value = steps
             }
+        }
+        
+        loadAutomationJob?.cancel()
+        loadAutomationJob = viewModelScope.launch(Dispatchers.IO) {
+            val automation = repository.getAutomationById(automationId)
+            _currentAutomation.value = automation
         }
     }
     
@@ -57,6 +67,40 @@ class AutomationViewModel(application: Application) : AndroidViewModel(applicati
     fun deleteAutomation(automation: Automation) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.deleteAutomation(automation)
+        }
+    }
+    
+    fun renameAutomation(automation: Automation, newName: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateAutomation(automation.copy(name = newName))
+        }
+    }
+    
+    fun cloneAutomation(automation: Automation) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val automations = repository.allAutomations.first()
+            val baseName = automation.name.substringBeforeLast(" (").trim()
+            val regex = Regex("""^${Regex.escape(baseName)}(?: \((\d+)\))?$""")
+            var maxIndex = 0
+            for (a in automations) {
+                val match = regex.matchEntire(a.name)
+                if (match != null) {
+                    val num = match.groupValues[1].takeIf { it.isNotEmpty() }?.toIntOrNull() ?: 0
+                    if (num >= maxIndex) {
+                        maxIndex = num + 1
+                    }
+                }
+            }
+            val newName = if (maxIndex == 0) "$baseName (1)" else "$baseName ($maxIndex)"
+            
+            val newAutomationId = repository.insertAutomation(Automation(name = newName))
+            val steps = repository.getStepsForAutomation(automation.id).first()
+            for (step in steps) {
+                repository.insertStep(step.copy(id = 0, automationId = newAutomationId))
+            }
+            viewModelScope.launch(Dispatchers.Main) {
+                Toast.makeText(getApplication(), "Automation cloned as $newName", Toast.LENGTH_SHORT).show()
+            }
         }
     }
     

@@ -7,6 +7,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
@@ -54,14 +55,56 @@ fun CreateAutomationScreen(
     }
 
     val steps by viewModel.currentSteps.collectAsState()
+    val automation by viewModel.currentAutomation.collectAsState()
+    var showRenameDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    var appsList by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            appsList = getInstalledApps(context)
+        }
+    }
+
+    if (showRenameDialog && automation != null) {
+        var renameText by remember { mutableStateOf(automation!!.name) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Automation") },
+            text = {
+                OutlinedTextField(
+                    value = renameText,
+                    onValueChange = { renameText = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.renameAutomation(automation!!, renameText)
+                    viewModel.loadStepsForAutomation(automationId) // Refresh name
+                    showRenameDialog = false
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Automation") },
+                title = { Text(automation?.name ?: "Edit Automation") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showRenameDialog = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Rename")
                     }
                 }
             )
@@ -81,6 +124,7 @@ fun CreateAutomationScreen(
             items(steps, key = { it.id }) { step ->
                 StepCard(
                     step = step,
+                    appsList = appsList,
                     onUpdate = { viewModel.updateStep(it) },
                     onDelete = { viewModel.deleteStep(step) },
                     onDuplicate = { viewModel.duplicateStep(step) },
@@ -112,6 +156,7 @@ fun CreateAutomationScreen(
 @Composable
 fun StepCard(
     step: AutomationStep,
+    appsList: List<AppInfo>,
     onUpdate: (AutomationStep) -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
@@ -125,6 +170,27 @@ fun StepCard(
     var isUnlockedLocally by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val activity = context as? androidx.fragment.app.FragmentActivity
+
+    // Debounce saves to database to prevent lag when typing
+    LaunchedEffect(searchTextState.text) {
+        if (searchTextState.text != step.searchText) {
+            kotlinx.coroutines.delay(500)
+            onUpdate(step.copy(searchText = searchTextState.text))
+        }
+    }
+    LaunchedEffect(typeTextState.text) {
+        if (typeTextState.text != step.typeText) {
+            kotlinx.coroutines.delay(500)
+            onUpdate(step.copy(typeText = typeTextState.text))
+        }
+    }
+    LaunchedEffect(delayTextState.text) {
+        val newDelay = delayTextState.text.toLongOrNull() ?: 0L
+        if (newDelay != step.delayAfter) {
+            kotlinx.coroutines.delay(500)
+            onUpdate(step.copy(delayAfter = newDelay))
+        }
+    }
 
     Card(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -159,19 +225,13 @@ fun StepCard(
             Spacer(modifier = Modifier.height(8.dp))
             
             if (step.action == Action.OPEN_APP) {
-                var apps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
                 var appExpanded by remember { mutableStateOf(false) }
-                LaunchedEffect(Unit) {
-                    withContext(Dispatchers.IO) {
-                        apps = getInstalledApps(context)
-                    }
-                }
                 
                 ExposedDropdownMenuBox(
                     expanded = appExpanded,
                     onExpandedChange = { appExpanded = !appExpanded }
                 ) {
-                    val currentApp = apps.find { it.packageName == step.searchText }?.name ?: step.searchText
+                    val currentApp = appsList.find { it.packageName == step.searchText }?.name ?: step.searchText
                     OutlinedTextField(
                         value = currentApp,
                         onValueChange = {},
@@ -185,7 +245,7 @@ fun StepCard(
                         onDismissRequest = { appExpanded = false },
                         modifier = Modifier.heightIn(max = 300.dp)
                     ) {
-                        apps.forEach { app ->
+                        appsList.forEach { app ->
                             DropdownMenuItem(
                                 text = { Text(app.name) },
                                 onClick = {
@@ -200,10 +260,7 @@ fun StepCard(
             } else {
                 OutlinedTextField(
                     value = searchTextState,
-                    onValueChange = { 
-                        searchTextState = it
-                        onUpdate(step.copy(searchText = it.text)) 
-                    },
+                    onValueChange = { searchTextState = it },
                     label = { Text("Search Text or Package/URL") },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -251,7 +308,6 @@ fun StepCard(
                     onValueChange = { 
                         if (!step.isLocked || isUnlockedLocally) {
                             typeTextState = it
-                            onUpdate(step.copy(typeText = it.text)) 
                         }
                     },
                     readOnly = step.isLocked && !isUnlockedLocally,
@@ -275,11 +331,7 @@ fun StepCard(
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = delayTextState,
-                onValueChange = { 
-                    delayTextState = it
-                    val delay = it.text.toLongOrNull() ?: 0L
-                    onUpdate(step.copy(delayAfter = delay))
-                },
+                onValueChange = { delayTextState = it },
                 label = { Text("Delay After Step (ms)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
