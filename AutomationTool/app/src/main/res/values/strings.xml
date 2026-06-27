@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AutomationTool</string>
+    <string name="accessibility_service_description">Automation Tool requires Accessibility Service to automate UI actions across different apps.</string>
+</resources>

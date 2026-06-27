@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialKeyguardLayout="@layout/automation_widget"
+    android:initialLayout="@layout/automation_widget"
+    android:minWidth="80dp"
+    android:minHeight="80dp"
+    android:previewImage="@mipmap/ic_launcher"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:configure="com.example.automationtool.widget.AutomationWidgetConfigureActivity" />
